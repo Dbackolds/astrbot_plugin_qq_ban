@@ -25,7 +25,8 @@ except Exception:  # pragma: no cover
 class QQBanPlugin(Star):
     """针对 QQ 群的退群黑名单管理插件。"""
 
-    DATA_DIR = os.path.join("data", "plugins", "astrbot_plugin_qq_ban")
+    DATA_DIR = os.path.join("data", "plugin_data", "astrbot_plugin_qq_ban")
+    LEGACY_DATA_DIR = os.path.join("data", "plugins", "astrbot_plugin_qq_ban")
 
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
@@ -57,17 +58,31 @@ class QQBanPlugin(Star):
     def _group_dir(self, group_id: str) -> str:
         return os.path.join(self.DATA_DIR, group_id)
 
+    def _legacy_group_dir(self, group_id: str) -> str:
+        return os.path.join(self.LEGACY_DATA_DIR, group_id)
+
     def _blacklist_file(self, group_id: str) -> str:
         return os.path.join(self._group_dir(group_id), "blacklist.json")
 
+    def _legacy_blacklist_file(self, group_id: str) -> str:
+        return os.path.join(self._legacy_group_dir(group_id), "blacklist.json")
+
     def _load_blacklist(self, group_id: str) -> Set[str]:
         path = self._blacklist_file(group_id)
+        legacy_path = self._legacy_blacklist_file(group_id)
         if not os.path.exists(path):
-            return set()
+            if os.path.exists(legacy_path):
+                path = legacy_path
+            else:
+                return set()
         try:
             with open(path, "r", encoding="utf-8") as file:
                 data = json.load(file)
-                return {str(uid) for uid in data}
+                members = {str(uid) for uid in data}
+                # 迁移旧目录数据
+                if path == legacy_path and members:
+                    self._save_blacklist(group_id, members)
+                return members
         except Exception as exc:  # pragma: no cover - 容错
             logger.error(f"读取黑名单失败: {exc}")
             return set()

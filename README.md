@@ -11,7 +11,7 @@ QQ 退群黑名单插件，主要功能：
    - `/ban_add <qq>` / `添加黑名单`：管理员或配置的插件管理员可手动加入黑名单。
    - `/ban_remove <qq>` / `解除黑名单`：管理员或插件管理员可移除黑名单。
 
-配置项通过 `_conf_schema.json` 在 AstrBot 面板中可视化修改，黑名单数据存放于 `data/plugins/astrbot_plugin_qq_ban/<群号>/blacklist.json`。
+配置项通过 `_conf_schema.json` 在 AstrBot 面板中可视化修改，黑名单数据存放于 `data/plugin_data/astrbot_plugin_qq_ban/<群号>/blacklist.json`。
 
 ## 指令速览
 
