@@ -36,6 +36,12 @@ class QQBanPlugin(Star):
         }
         self.notice_enabled: bool = self.config.get("enable_blacklist_notice", True)
         self.auto_approve_enabled: bool = self.config.get("enable_auto_approve", False)
+        self.auto_approve_notice_enabled: bool = self.config.get(
+            "enable_auto_approve_notice", False
+        )
+        self.admin_ids: Set[str] = {
+            str(uid).strip() for uid in self.config.get("admin_ids", []) if uid
+        }
         self.reject_reason: str = (
             self.config.get("reject_reason")
             or "黑名单成员，拒绝加入。"
@@ -87,12 +93,33 @@ class QQBanPlugin(Star):
     def _in_blacklist(self, group_id: str, user_id: str) -> bool:
         return user_id in self._load_blacklist(group_id)
 
+    def _remove_from_blacklist(self, group_id: str, user_id: str) -> bool:
+        members = self._load_blacklist(group_id)
+        if user_id not in members:
+            return False
+        members.remove(user_id)
+        self._save_blacklist(group_id, members)
+        logger.info(f"[QQBan] {user_id} 已从群 {group_id} 黑名单移除")
+        return True
+
     def _group_allowed(self, group_id: str) -> bool:
         if not group_id:
             return False
         if not self.enforce_whitelist:
             return True
         return group_id in self.group_whitelist
+
+    def _current_group_id(self, event: AstrMessageEvent) -> str:
+        group_id = getattr(event.message_obj, "group_id", "")
+        return str(group_id or "")
+
+    def _has_manage_permission(self, event: AstrMessageEvent) -> bool:
+        sender_id = str(event.get_sender_id())
+        if sender_id in self.admin_ids:
+            return True
+        sender = getattr(event.message_obj, "sender", None)
+        role = getattr(sender, "role", None)
+        return role == "admin"
 
     # ---------------------------- 事件分发逻辑 -----------------------------
     @filter.event_message_type(filter.EventMessageType.ALL)
@@ -150,9 +177,9 @@ class QQBanPlugin(Star):
 
         if self.auto_approve_enabled:
             success = await self._process_group_request(event, flag, sub_type, approve=True)
-            if success and self.notice_enabled:
+            if success and self.notice_enabled and self.auto_approve_notice_enabled:
                 yield event.plain_result(
-                    f"成员 {self._format_member(user_id)} 的入群申请已自动同意。"
+                    f"成员 {user_id} 的入群申请已自动同意。"
                 )
 
     async def _process_group_request(
@@ -204,7 +231,9 @@ class QQBanPlugin(Star):
 
     def _render_leave_notice(self, group_id: str, user_id: str) -> str:
         data = {
-            "member": self._format_member(user_id),
+            "member": self._format_member(user_id),  # 兼容旧模板
+            "member_at": self._format_member(user_id),
+            "member_plain": user_id,
             "user_id": user_id,
             "group_id": group_id,
         }
@@ -216,3 +245,55 @@ class QQBanPlugin(Star):
 
     async def terminate(self):  # pragma: no cover
         logger.info("[QQBan] 插件已卸载。")
+
+    # ---------------------------- 指令：查询/增删黑名单 ---------------------
+    @filter.command("ban_check", alias={"黑名单查询"})
+    async def cmd_ban_check(self, event: AstrMessageEvent, qq: str):
+        group_id = self._current_group_id(event)
+        if not group_id:
+            yield event.plain_result("仅支持在群聊中使用。")
+            return
+        qq = qq.strip()
+        if not qq:
+            yield event.plain_result("请提供要查询的 QQ 号。")
+            return
+        if self._in_blacklist(group_id, qq):
+            yield event.plain_result(f"QQ {qq} 在本群黑名单中。")
+        else:
+            yield event.plain_result(f"QQ {qq} 不在本群黑名单。")
+
+    @filter.command("ban_add", alias={"添加黑名单"})
+    async def cmd_ban_add(self, event: AstrMessageEvent, qq: str):
+        group_id = self._current_group_id(event)
+        if not group_id:
+            yield event.plain_result("仅支持在群聊中使用。")
+            return
+        if not self._has_manage_permission(event):
+            yield event.plain_result("你没有权限执行此操作。")
+            return
+        qq = qq.strip()
+        if not qq:
+            yield event.plain_result("请提供要加入黑名单的 QQ 号。")
+            return
+        if self._add_to_blacklist(group_id, qq):
+            yield event.plain_result(f"已将 QQ {qq} 加入本群黑名单。")
+        else:
+            yield event.plain_result(f"QQ {qq} 已在黑名单中。")
+
+    @filter.command("ban_remove", alias={"解除黑名单"})
+    async def cmd_ban_remove(self, event: AstrMessageEvent, qq: str):
+        group_id = self._current_group_id(event)
+        if not group_id:
+            yield event.plain_result("仅支持在群聊中使用。")
+            return
+        if not self._has_manage_permission(event):
+            yield event.plain_result("你没有权限执行此操作。")
+            return
+        qq = qq.strip()
+        if not qq:
+            yield event.plain_result("请提供要移除的 QQ 号。")
+            return
+        if self._remove_from_blacklist(group_id, qq):
+            yield event.plain_result(f"已将 QQ {qq} 从本群黑名单移除。")
+        else:
+            yield event.plain_result(f"QQ {qq} 原本不在黑名单中。")

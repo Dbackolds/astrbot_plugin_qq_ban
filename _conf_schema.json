@@ -23,10 +23,15 @@
     "description": "是否自动同意非黑名单成员的入群申请。",
     "default": false
   },
+  "enable_auto_approve_notice": {
+    "type": "bool",
+    "description": "自动同意入群时是否向群内提示。",
+    "default": false
+  },
   "leave_notice_template": {
     "type": "string",
-    "description": "退群提示模板，可使用 {member}、{user_id}、{group_id} 占位符。",
-    "default": "成员 {member} 已退出群聊，并被加入黑名单。"
+    "description": "退群提示模板，可使用 {member_at}、{member_plain}、{user_id}、{group_id} 等占位符。",
+    "default": "成员 {member_plain} 已退出群聊，并被加入黑名单。"
   },
   "reject_reason": {
     "type": "string",
