@@ -249,6 +249,7 @@ class QQBanPlugin(Star):
     # ---------------------------- 指令：查询/增删黑名单 ---------------------
     @filter.command("ban_check", alias={"黑名单查询"})
     async def cmd_ban_check(self, event: AstrMessageEvent, qq: str):
+        """查询指定 QQ 是否存在于当前群的黑名单。"""
         group_id = self._current_group_id(event)
         if not group_id:
             yield event.plain_result("仅支持在群聊中使用。")
@@ -264,6 +265,7 @@ class QQBanPlugin(Star):
 
     @filter.command("ban_add", alias={"添加黑名单"})
     async def cmd_ban_add(self, event: AstrMessageEvent, qq: str):
+        """将指定 QQ 加入当前群的黑名单，需要管理权限。"""
         group_id = self._current_group_id(event)
         if not group_id:
             yield event.plain_result("仅支持在群聊中使用。")
@@ -282,6 +284,7 @@ class QQBanPlugin(Star):
 
     @filter.command("ban_remove", alias={"解除黑名单"})
     async def cmd_ban_remove(self, event: AstrMessageEvent, qq: str):
+        """从当前群黑名单中移除指定 QQ，需要管理权限。"""
         group_id = self._current_group_id(event)
         if not group_id:
             yield event.plain_result("仅支持在群聊中使用。")
